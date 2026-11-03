@@ -2,13 +2,13 @@
 
 A Greptile-style code review your coding agent runs locally, before you open the PR.
 
-Two reviewer sub-agents read the change in parallel. Each focuses on a different area, and they can run on different model families. The main agent then checks every finding against the code and drops what doesn't hold up. You get a report formatted like a Greptile PR comment, starting with the line you care about:
+Two reviewer sub-agents read the change in parallel, each with a different focus. The main agent then checks every finding against the code and drops what doesn't hold up. You get a report formatted like a Greptile PR comment, starting with the line you care about:
 
 ```
 ## Confidence Score: 3/5 — 1 P1 · 2 P2
 ```
 
-Works with **OpenCode** (plain, or with [oh-my-openagent](https://github.com/code-yeongyu/oh-my-openagent)), **Claude Code** and **Codex**. Hosts without sub-agents fall back to a two-pass single-agent review.
+The skill names no models or agent types: it asks your harness for two sub-agents, preferably of different kinds, and lets the harness pick. It works in OpenCode (with or without oh-my-openagent), Claude Code, Codex, or any harness that loads Agent Skills. Without sub-agents, the main agent does both passes itself.
 
 ## What you get
 
@@ -82,11 +82,9 @@ Or ask in plain words: "review my changes before I open the PR", "is this branch
 ## How it works
 
 1. **Scope.** `scripts/scope.sh` pins the diff range and lists the changed files, commits, and the repo's rule files (`AGENTS.md`, `CLAUDE.md`, `greptile.json`, `.coderabbit.yaml`, lessons-learned files).
-2. **Review.** Two reviewers get the same self-contained brief ([references/reviewer-brief.md](references/reviewer-brief.md)). Reviewer A focuses on correctness and contracts and reads the files in diff order. Reviewer B focuses on failure paths, security and tests and reads them in reverse order. Large changes get a third reviewer for contracts, data and security.
+2. **Review.** Two sub-agents get the same self-contained brief ([references/reviewer-brief.md](references/reviewer-brief.md)). Reviewer A focuses on correctness and contracts and reads the files in diff order. Reviewer B focuses on failure paths, security and tests and reads them in reverse order.
 3. **Verify.** The main agent merges duplicates, re-reads the code behind every single-reviewer finding, and drops anything not introduced by the change, not reachable, already guarded, or just style.
-4. **Report.** Score, findings, summary, diagram, details, and a footer that says which models reviewed and what actually ran.
-
-With oh-my-openagent, reviewer A runs on the `deep-low` category and B on `unspecified-high`, which by default are GPT and Claude. Two model families catch more than one. On other hosts, both reviewers run on your session's model.
+4. **Report.** Score, findings, summary, diagram, details, and a footer saying who reviewed and what actually ran.
 
 ## Tips
 
