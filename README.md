@@ -34,7 +34,10 @@ Do not merge until webhook signatures are enforced and renewals extend from the 
 
 - **Score**: Greptile's 0-5 merge-readiness scale. Any P0 gives 0/5. Otherwise the score is 5 minus the number of P1s, P2-only gives 4/5, and a security P1 costs one extra point. These rules reproduce Greptile's own score on 96% of 722 real Greptile reviews.
 - **Priorities**: P0 drop everything, P1 fix before merge, P2 should fix, P3 minor.
-- **Reports only, unless you ask for fixes.** Say "review and fix" (or ask after the report) and the agent fixes the confirmed findings, adds tests, and reviews again.
+- **Three modes**, picked from how you ask:
+  - *Review* (default): the report, nothing else. No code changes.
+  - *Review and fix* ("review it, then fix the bugs"): report, fix the confirmed findings with tests, re-review, and finish with a summary.
+  - *Target score* ("keep going until 5/5"): review, fix and re-review in a loop until the score reaches the target (at most 5 rounds, and it stops early if a round doesn't improve the score).
 
 ## Install
 
@@ -82,7 +85,7 @@ Or ask in plain words: "review my changes before I open the PR", "is this branch
 ## How it works
 
 1. **Scope.** `scripts/scope.sh` pins the diff range and lists the changed files, commits, and the repo's rule files (`AGENTS.md`, `CLAUDE.md`, `greptile.json`, `.coderabbit.yaml`, lessons-learned files).
-2. **Review.** Two sub-agents get the same self-contained brief ([references/reviewer-brief.md](references/reviewer-brief.md)). Reviewer A focuses on correctness and contracts and reads the files in diff order. Reviewer B focuses on failure paths, security and tests and reads them in reverse order.
+2. **Review.** Two sub-agents get the same self-contained brief ([references/reviewer-brief.md](references/reviewer-brief.md)). Each one first learns how the repo already does things: rule and lesson files, sibling implementations of the same pattern, the tests of the touched code, and the git history of the changed lines (so a change that undoes an old fix gets caught). Then they dig where bugs concentrate (incomplete changes, conditions, error paths, contracts, state, deleted code, trust boundaries, tests) and prove each candidate by tracing concrete values through the code. Reviewer A and reviewer B each go deepest on a different half of that list and read the files in opposite orders.
 3. **Verify.** The main agent merges duplicates, re-reads the code behind every single-reviewer finding, and drops anything not introduced by the change, not reachable, already guarded, or just style.
 4. **Report.** Score, findings, summary, diagram, details, and a footer saying who reviewed and what actually ran.
 

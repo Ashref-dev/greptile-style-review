@@ -1,20 +1,26 @@
 ---
 name: greptile-style-review
-description: Greptile-style pre-PR code review run locally. Two reviewer sub-agents review the change in parallel, the orchestrator verifies every finding, and the report leads with a Greptile-calibrated Confidence Score N/5 and the P1 count, followed by P0-P3 findings with file:line, trigger, impact and fix, a summary and a flow diagram. Reviews the current branch against its base (dev, else main) plus uncommitted work, or a given commit, branch or GitHub PR. Use when the user runs /greptile-style-review or $greptile-style-review, or asks to review a branch or changes before a PR, for a pre-PR or Greptile-style review, to score changes, whether a change is ready to merge, or to find bugs in their changes. Reports only; edits code only when the user asks for fixes.
+description: Pre-merge code review run locally. Two reviewer sub-agents review the change in parallel, the orchestrator verifies every finding, and the report leads with a Confidence Score N/5 and the P1 count, followed by P0-P3 findings with file:line, trigger, impact and fix, a summary and a flow diagram. Reviews the current branch against its base (dev, else main) plus uncommitted work, or a given branch, commit or GitHub PR. Can also fix the findings and re-review, or loop until a target score such as 4/5 or 5/5. Use when the user runs /greptile-style-review or $greptile-style-review, or asks to review a branch or changes before a PR, for a pre-PR or Greptile-style review, to score changes, whether a change is ready to merge, to find bugs in their changes, or to review and fix. Edits code only when the user asks for fixes.
 license: MIT
 compatibility: Needs git and bash. Optional - a sub-agent tool for parallel reviewers, gh for PR mode.
 metadata:
-  version: "2.1.0"
+  version: "2.2.0"
   source: https://github.com/Ashref-dev/greptile-style-review
 ---
 
-# Greptile-style review
+# Pre-merge code review
 
-Catch the bugs Greptile or a strong senior reviewer would flag, before the PR exists, and report them the way Greptile does. You orchestrate: pin the scope, run two independent reviewers in parallel, verify what they find, score it, write the report.
+Find the defects a careful senior engineer would block a merge for, prove each one, and report them so the developer sees at a glance whether the change is ready. You orchestrate: pin the scope, run two independent reviewers in parallel, verify what they find, score it, write the report.
 
-Reviewing is read-only: no edits, formatting, staging, commits, checkout or pushes. Fix code only when the user asks (see "Fixing findings").
+The review itself is read-only, so the code being judged doesn't change under the reviewers. Edit code only in a mode where the user asked for fixes.
 
-Your report starts with the score heading, with no preamble:
+Pick the mode from what the user asked:
+
+- **Review** (default): steps 1-5, then stop. The report is the deliverable.
+- **Review and fix** ("review and fix", "then fix the bugs", or asking for fixes after a report): steps 1-5, then "Fixing findings" once, then a final summary.
+- **Target score** ("until 4/5", "until you get a 5/5"): repeat review and fix until the score reaches the target, as described in "Target score".
+
+Every report starts with the score heading, with no preamble, because that line tells the developer whether the change can merge and how many P1s block it:
 
 ```
 ## Confidence Score: 3/5 — 2 P1 · 1 P2
@@ -28,7 +34,7 @@ From inside the repository (`<skill-dir>` is the folder holding this file):
 bash <skill-dir>/scripts/scope.sh [branch | commit | PR number or URL] [--base <branch>]
 ```
 
-It prints the scope line, the pinned diff command, how to read files, changed files, commits, rule files (AGENTS.md, CLAUDE.md, greptile.json, ...), lesson files and a size class. With no argument it reviews uncommitted work plus the branch's commits since its base (`dev`, else `main`, else `master`). Exit code 2 means there is nothing to review: say so and stop. Without bash, gather the same facts with git.
+It prints the scope line, the pinned diff command, how to read files, changed files, commits, rule files (AGENTS.md, CLAUDE.md, greptile.json, ...), lesson files and a size class. With no argument it reviews uncommitted work plus the current branch's commits since its base (`dev`, else `main`, else `master`); with a branch name it reviews that branch against the base. Exit code 2 means there is nothing to review: say so and stop. Without bash, gather the same facts with git.
 
 Note the intent from the commits, the PR body and this conversation, and list stated decisions ("intentionally", "by design"). They are acknowledged behavior, not findings. A code comment written in the same change is not a decision.
 
@@ -40,14 +46,14 @@ Each reviewer's prompt is this header, filled in, followed by references/reviewe
 
 ```
 REVIEW HEADER
-REVIEWER: <A | B>                    LENS: <A: correctness and contracts | B: failure paths, security and tests>
+REVIEWER: <A | B>                    LENS: <A: incomplete changes, conditions, contracts, intent | B: error paths, state, deleted code, trust boundaries, tests>
 REPO: <absolute path>                SCOPE: <scope line>
 DIFF: <DIFF line from scope.sh>
 FILE ACCESS: <FILE ACCESS line from scope.sh>
 FILES (read in this order): <A: diff order | B: reverse order>
 INTENT: <2-5 lines>                  STATED DECISIONS: <list, or none>
 RULE FILES: <paths>                  LESSON FILES: <paths>
-BUDGET: <about 25 tool calls if small, 40 if medium, 60 if large>
+BUDGET: <about 30 tool calls if small, 50 if medium, 70 if large>
 PREVIOUS FINDINGS: <re-review only: number, title, location>
 ```
 
@@ -67,7 +73,7 @@ Wait for both. Don't review the change yourself while they run. If one fails or 
 - **P3**: minor. Stale docs or comments, dead code left behind. At most 5; they never affect the score.
 - Tag 🔒 findings that involve auth, permissions, tenant boundaries, secrets or injection.
 
-Score (matches Greptile's own score on 96% of 722 real Greptile reviews):
+Score:
 1. Any P0: **0/5**.
 2. Otherwise **5 minus the number of P1s**, never below 0. No P1 but a P2: **4/5**. Nothing above P3: **5/5**.
 3. Each 🔒 P1 costs one extra point.
@@ -130,13 +136,17 @@ Stripe ──▶ POST /webhooks/stripe ──▶ verify signature ──▶ invo
 
 ## Fixing findings
 
-The report is the deliverable. If the user did not ask for fixes, stop after it.
-
-If they asked (in the original request or afterwards), show the full report first, then fix the confirmed P0-P2 findings (P3s too if they asked for everything). Keep each fix minimal, add a test that fails without it, run the relevant checks, then re-review.
+Show the full report first, so the developer sees what was found before anything changes. Then fix the confirmed P0-P2 findings (P3s too if the user asked for everything). Keep each fix minimal and in the style of the surrounding code, add a test that fails without the fix, and run the relevant tests and checks. Then re-review.
 
 ## Re-review
 
-Run the process again on the new state, listing the previous findings under PREVIOUS FINDINGS. Keep the score heading first. Under the action sentence, add one line per previous finding (`✅ Fixed`, `❌ Still open` or `↩️ Withdrawn`), or a single line if all are fixed. Number the footer `Reviews (2)`, `Reviews (3)`, and so on.
+Run steps 1-5 again on the new state, with the previous findings listed under PREVIOUS FINDINGS in each header. Keep the score heading first. Under the action sentence, add one line per previous finding (`✅ Fixed`, `❌ Still open` or `↩️ Withdrawn`), or a single line if all are fixed. Number the footer `Reviews (2)`, `Reviews (3)`, and so on.
+
+After the last re-review in a fixing mode, end with a short summary: the final score, what was fixed (one line per finding, with the test that covers it), the checks that ran, and anything left open with the reason.
+
+## Target score
+
+Loop review → fix → re-review until the score reaches the target. Show each round's report as you go. Stop after 5 rounds, or earlier if a round does not raise the score, because further rounds are then unlikely to converge; report the remaining blockers and ask how to proceed. End with the summary above plus a one-line score history (for example `2/5 → 4/5 → 5/5`).
 
 ## Reminders
 
